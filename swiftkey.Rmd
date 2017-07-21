@@ -1,0 +1,59 @@
+---
+title: "Swift Key Coursera NLP Project"
+output: html_notebook
+---
+
+# Description 
+
+## Swiftkey is a Natural Language processing project on Final Capstone project in the Coursera Data Science Specialization Course
+
+###Tasks to accomplish
+
+  - Tokenization - identifying appropriate tokens such as words, punctuation, and numbers. Writing a function that takes a file as input and returns a tokenized version of it.
+  - Profanity filtering - removing profanity and other words you do not want to predict.
+
+```{r Loading the Data, message=FALSE, warning=FALSE, eval=TRUE, echo=TRUE}
+path1 <- "C:/Public/Data-Science[JHU-Coursera]/project-nlp"
+
+for(i in list.files(path = path1, pattern = "\\.zip$")) {
+  unzip(i, overwrite = TRUE)
+}
+```
+
+## Getting the Filenames and also getting connections to read the Text files
+
+```{r checking the files, message=FALSE, warning=FALSE, eval=TRUE, echo=TRUE}
+foldernames <- c("DE", "US", "FI", "RU")
+filenames_n<-character(0)
+for (j in list.dirs(path = path1)) {
+  if (length(unlist(strsplit(basename(j),"_")[[1]])) == 2) {
+    for (k in list.files(path = j)) {
+      # Grep based on Categories and then read
+      filenames_n <- c(filenames_n, unlist(strsplit(k, "\\.txt"))[1])
+  }
+  }
+}
+```
+
+## Getting the lines
+
+```{r checking the first few lines, message=FALSE, warning=FALSE, eval=TRUE, echo=TRUE}
+filenames_n
+
+for (j in list.dirs(path = path1)) {
+  if (length(unlist(strsplit(basename(j),"_")[[1]])) == 2) {
+    for (k in list.files(path = j)) {
+      # Grep based on Categories and then read
+      print(k)
+      dataset:con <- file(k, "r") 
+      readLines(con, 1)
+  }
+  }
+}
+
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
