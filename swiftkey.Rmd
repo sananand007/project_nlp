@@ -13,7 +13,8 @@ output: html_notebook
   - Profanity filtering - removing profanity and other words you do not want to predict.
 
 ```{r Loading the Data, message=FALSE, warning=FALSE, eval=TRUE, echo=TRUE}
-path1 <- "C:/Public/Data-Science[JHU-Coursera]/project-nlp"
+path1<-NULL
+path1 <- "C:/Public/Data-Science[JHU-Coursera]/project_nlp"
 
 for(i in list.files(path = path1, pattern = "\\.zip$")) {
   unzip(i, overwrite = TRUE)
@@ -28,8 +29,9 @@ filenames_n<-character(0)
 for (j in list.dirs(path = path1)) {
   if (length(unlist(strsplit(basename(j),"_")[[1]])) == 2) {
     for (k in list.files(path = j)) {
-      # Grep based on Categories and then read
-      filenames_n <- c(filenames_n, unlist(strsplit(k, "\\.txt"))[1])
+      if (grepl(".txt",k, perl = TRUE)) {
+        filenames_n <- c(filenames_n, unlist(strsplit(k, "\\.txt"))[1]) 
+      }
   }
   }
 }
@@ -38,19 +40,70 @@ for (j in list.dirs(path = path1)) {
 ## Getting the lines
 
 ```{r checking the first few lines, message=FALSE, warning=FALSE, eval=TRUE, echo=TRUE}
-filenames_n
+library(stringi)
+
+countern<<-0
+storeval <- c()
+lines<-NULL
 
 for (j in list.dirs(path = path1)) {
   if (length(unlist(strsplit(basename(j),"_")[[1]])) == 2) {
     for (k in list.files(path = j)) {
       # Grep based on Categories and then read
-      print(k)
-      dataset:con <- file(k, "r") 
-      readLines(con, 1)
+      if (grepl(".txt", k, perl = TRUE)) {
+        pathtemp <- paste(j,k, sep = "/")
+        if (grepl("en_US.twitter", pathtemp, perl = TRUE)) {
+          print(pathtemp)
+          countern<<-countern+1
+          conntemp <- file(pathtemp, open = "r")
+          lines<-nchar(readLines(conntemp))
+          storeval[countern] <- max(lines)
+          #val1<-findcount(conntemp,"love")
+          #val2<-findcount(conntemp,"hate")
+          
+          close(conntemp) 
+        }
+      }
   }
   }
 }
 
+```
+
+```{r Find the length of the biggest line, message=FALSE, eval=TRUE, warning=FALSE}
+library(stringi)
+
+
+storeval <- c()
+lines<-NULL
+
+for (j in list.dirs(path = path1)) {
+  if (length(unlist(strsplit(basename(j),"_")[[1]])) == 2) {
+    for (k in list.files(path = j)) {
+      # Grep based on Categories and then read
+      if (grepl(".txt", k, perl = TRUE)) {
+        pathtemp <- paste(j,k, sep = "/")
+        if (grepl("en_US.twitter", pathtemp, perl = TRUE)) {
+          print(pathtemp)
+          conntemp1 <- file(pathtemp, open = "r")
+          linesnew <- readLines(conntemp1)
+          val1<-grepl(".love.", linesnew, perl = TRUE, ignore.case = FALSE)
+          val2<-grepl(".hate.", linesnew, perl = TRUE, ignore.case = FALSE)
+          close(conntemp1) 
+        }
+      }
+  }
+  }
+}
+
+sum(val1)/sum(val2)
+
+#Tweet for "biostats" match
+linesnew[grepl(".biostats.", linesnew, ignore.case = FALSE, perl = TRUE)]
+
+#Tweets of the exact characters
+teststring <- "A computer once beat me at chess, but it was no match for me at kickboxing"
+linesnew[grepl(teststring, linesnew, perl = TRUE, ignore.case = FALSE)]
 ```
 
 
