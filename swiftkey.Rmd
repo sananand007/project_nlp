@@ -1,20 +1,46 @@
 ---
-title: "Swift Key Coursera NLP Project"
-output: html_notebook
+title: "Swift Key Coursera NLP Project - Milestone report"
+output:
+  html_notebook: default
+  html_document: default
+Date: August 5, 2017
 ---
 
 # Description 
 
-## Swiftkey is a Natural Language processing project on Final Capstone project in the Coursera Data Science Specialization Course
+### Swiftkey is a Natural Language processing project as the Final Capstone project in the Coursera Data Science Specialization Course
 
-###Tasks to accomplish
+## Introduction and Summary
+
+This is a concise Markdown document that is describing the step by step process of handling this NLP project . This is the first milestone report that is showing the progress for the complete project.
+
+**The motivation for this project is to:** 
+
+  1. Demonstrate that you've downloaded the data and have successfully loaded it in.
+  2. Create a basic report of summary statistics about the data sets.
+  3. Report any interesting findings that you amassed so far.
+  4. Get feedback on your plans for creating a prediction algorithm and Shiny app.
+
+###Tasks to accomplish mostly concentrates on the Milestone goals and the Task-2 for the week no. 2
 
   - Tokenization - identifying appropriate tokens such as words, punctuation, and numbers. Writing a function that takes a file as input and returns a tokenized version of it.
   - Profanity filtering - removing profanity and other words you do not want to predict.
+  - Does the link lead to an HTML page describing the exploratory analysis of the training data set?
+  - Has the data scientist done basic summaries of the three files? Word counts, line counts and basic data tables?
+  - Has the data scientist made basic plots, such as histograms to illustrate features of the data?
+  - Was the report written in a brief, concise style, in a way that a non-data scientist manager could appreciate?
 
-```{r Loading the Data, message=FALSE, warning=FALSE, eval=TRUE, echo=TRUE}
+# Loading the Data and Data Description
+
+**Course dataset**
+
+This is the training data to get you started that will be the basis for most of the capstone. You must download the data from the link below and not from external websites to start.
+
+  - https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip
+
+```{r Loading the Data, message=FALSE, warning=FALSE, eval=FALSE, echo=TRUE}
 path1<-NULL
-path1 <- "C:/Public/Data-Science[JHU-Coursera]/project_nlp"
+path1 <- "C:/Public/nlp"
 
 for(i in list.files(path = path1, pattern = "\\.zip$")) {
   unzip(i, overwrite = TRUE)
@@ -24,6 +50,7 @@ for(i in list.files(path = path1, pattern = "\\.zip$")) {
 ## Getting the Filenames and also getting connections to read the Text files
 
 ```{r checking the files, message=FALSE, warning=FALSE, eval=TRUE, echo=TRUE}
+path1 <- "C:/Public/nlp"
 foldernames <- c("DE", "US", "FI", "RU")
 filenames_n<-character(0)
 for (j in list.dirs(path = path1)) {
@@ -37,40 +64,367 @@ for (j in list.dirs(path = path1)) {
 }
 ```
 
-## Getting the lines
+## Getting the Data that is of Concern
+
+  - Loading the data in. This dataset is fairly large. We emphasize that you don't necessarily need to load the entire dataset in to build your algorithms (see point 2 below). At least initially, you might want to use a smaller subset of the data.
+  - Sampling. To reiterate, to build models you don't need to load in and use all of the data. 
+ 
 
 ```{r checking the first few lines, message=FALSE, warning=FALSE, eval=TRUE, echo=TRUE}
 library(stringi)
+library(strip)
 
 countern<<-0
-storeval <- c()
 lines<-NULL
+filesize <- c()
 
 for (j in list.dirs(path = path1)) {
-  if (length(unlist(strsplit(basename(j),"_")[[1]])) == 2) {
-    for (k in list.files(path = j)) {
-      # Grep based on Categories and then read
-      if (grepl(".txt", k, perl = TRUE)) {
-        pathtemp <- paste(j,k, sep = "/")
-        if (grepl("en_US.twitter", pathtemp, perl = TRUE)) {
-          print(pathtemp)
-          countern<<-countern+1
-          conntemp <- file(pathtemp, open = "r")
-          lines<-nchar(readLines(conntemp))
-          storeval[countern] <- max(lines)
-          #val1<-findcount(conntemp,"love")
-          #val2<-findcount(conntemp,"hate")
-          
-          close(conntemp) 
-        }
-      }
-  }
+  #print(unlist(strsplit(basename(j),"_")[[1]])[1])
+  if ((length(unlist(strsplit(basename(j),"_")[[1]])) == 2) & (unlist(strsplit(basename(j),"_")[[1]])[1] == "en") ) {
+     for (k in list.files(path = j)) {
+       # Grep based on Categories and then read
+       if (grepl(".txt", k, perl = TRUE)) {
+         countern<<-countern+1
+         pathtemp <- paste(j,k, sep = "/")
+         filesize[countern]<-file.size(pathtemp)
+         nam <- unlist(strip(strsplit(pathtemp, "/")))[6]
+         assign(nam, NULL)
+         conntemp <- file(pathtemp, open = "r")
+         lines <- readLines(conntemp)
+         assign(nam , lines)
+         close(conntemp) 
+       }
+   }
   }
 }
 
 ```
 
-```{r Find the length of the biggest line, message=FALSE, eval=TRUE, warning=FALSE}
+# Data Cleaning and representation of the data
+
+  - Taking a Small Sample as the data is quite huge to process and clean in one go
+  - Subsampling the entire text as the whole is very large to process here
+  - Making a corpus here for all three smaller sub samples using the "tm" package
+  - One thing though the size of the corpus for even the samples are quite large, this makes a conclusion that we might have to think of a different approach to store these as a whole
+
+```{r Find the Frequency of words for all the three files, echo=FALSE, message=FALSE, warning=FALSE}
+library(data.table)
+
+en_US.blogs.txt.dt<-as.data.table(en_US.blogs.txt)
+en_US.news.txt.dt<-as.data.table(en_US.news.txt)
+en_US.twitter.txt.dt<-as.data.table(en_US.twitter.txt)
+
+Desc.dt <- data.table(File = c("n_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt"), size = filesize/10^6, linecount = c(en_US.blogs.txt.dt[,.N], en_US.news.txt.dt[,.N], en_US.twitter.txt.dt[, .N]))
+
+Desc.dt
+
+sample_size <- 0.03 #only 3% for now
+
+blogs_sub=NULL
+usnews_sub=NULL
+ustwitter_sub=NULL
+blogs_sub <- en_US.blogs.txt[1:as.integer(sample_size*length(en_US.blogs.txt))]
+usnews_sub <- en_US.news.txt[1:as.integer(sample_size*length(en_US.news.txt))]
+ustwitter_sub <- en_US.news.txt[1:as.integer(sample_size*length(en_US.twitter.txt))]
+
+# Using the tm package to create a corpus
+
+library(tm)
+createCorpus <- function(listval) {
+  vs <- VectorSource(listval)
+  Corpus(vs, readerControl = list(readPlain,language="en", load=TRUE))
+}
+
+corpusblogs=NULL
+corpususnews=NULL
+corpustwitter=NULL
+corpusblogs <- createCorpus(blogs_sub)
+corpususnews <- createCorpus(usnews_sub)
+corpustwitter <- createCorpus(ustwitter_sub)
+
+```
+
+## Analyzing the corpus here and Cleaning using the "tm" package
+
+  - Checking for Puntuations , numbers , periods, hyphens  etc and removing them
+  - Converting the entire document to lower case
+  - Removing stopwords (extremely common words such as "and", "or", "not", "in", "is" etc)
+    + This is an interesting effect based on the fact that N-grams might be affected due to this
+    + Upto to us if we want to take this out or not, I am deciding to take these out
+  - Removing numbers
+  - Filtering out unwanted terms and weird characters
+  - Removing extra whitespace
+
+
+```{r Analysing the corpus, echo=TRUE, eval=TRUE,warning=FALSE, message=FALSE}
+# How to see a line when in Vcorpus format
+lapply(c(1:3), function(x) {
+ strwrap(corpusblogs[[x]]) 
+})
+
+# To Lower case
+corpusblogs_proc1 <- tm_map(corpusblogs, content_transformer(tolower)) 
+corpususnews_proc1 <- tm_map(corpususnews, content_transformer(tolower))
+corpustwitter_proc1 <- tm_map(corpustwitter, content_transformer(tolower))
+
+#Replacing the Full stops and commas and pinctuations 
+corpusblogs_proc1 <- tm_map(corpusblogs_proc1, removePunctuation) 
+corpususnews_proc1 <- tm_map(corpususnews_proc1, content_transformer(tolower))
+corpustwitter_proc1 <- tm_map(corpustwitter_proc1, content_transformer(tolower))
+
+#Removing Whitespace
+corpusblogs_proc1 <- tm_map(corpusblogs_proc1, stripWhitespace) 
+corpususnews_proc1 <- tm_map(corpususnews_proc1, stripWhitespace)
+corpustwitter_proc1 <- tm_map(corpustwitter_proc1, stripWhitespace)
+
+#Removing Numbers
+corpusblogs_proc1 <- tm_map(corpusblogs_proc1, removeNumbers) 
+corpususnews_proc1 <- tm_map(corpususnews_proc1, removeNumbers)
+corpustwitter_proc1 <- tm_map(corpustwitter_proc1, removeNumbers)
+
+#Removing weird characters and ASCII
+toSpace <- content_transformer(function (x , pattern) gsub(pattern, " ", x))
+corpusblogs_proc1 <- tm_map(corpusblogs_proc1, toSpace, "â???") 
+corpususnews_proc1 <- tm_map(corpususnews_proc1, toSpace, "â???")
+corpustwitter_proc1 <- tm_map(corpustwitter_proc1, toSpace, "â???")
+
+toNormal <- content_transformer(function (x) iconv(x, "latin1", "ASCII", sub=""))
+corpusblogs_proc1 <- tm_map(corpusblogs_proc1, toNormal) 
+corpususnews_proc1 <- tm_map(corpususnews_proc1, toNormal)
+corpustwitter_proc1 <- tm_map(corpustwitter_proc1, toNormal)
+
+
+#Removing english Stop words is a Choice
+corpusblogs_proc1 <- tm_map(corpusblogs_proc1, removeWords, stopwords("english")) 
+corpususnews_proc1 <- tm_map(corpususnews_proc1, removeWords, stopwords("english"))
+corpustwitter_proc1 <- tm_map(corpustwitter_proc1, removeWords, stopwords("english"))
+
+
+#strwrap(corpusblogs_proc1[[1]])
+#iconv(strwrap(corpusblogs_proc1[[1]]), "latin1", "ASCII", sub = "")  
+
+```
+
+
+# Build a Data table for the text present (Obvious as they ridiculously optimized to handle big data!!) 
+  - Blogs data considered and plotted here
+  - First Convert the Corpus into a Data-table for better handling
+  - Getting the Frequency of words and plotting
+
+```{r Find the Frequency Distributions of the Words, message=FALSE, eval=TRUE, warning=FALSE}
+library(data.table)
+library(dplyr)
+library(tidytext)
+library(ggplot2)
+
+corpusblogs_proc1.dt <- NULL
+corpususnews_proc1.dt<-NULL
+corpustwitter_proc1.dt<-NULL
+
+# Blogs
+corpusblogs_proc1.dt <- data.table(text=sapply(corpusblogs_proc1, identity), stringsAsFactors = F) 
+corpusblogs_proc1.dt.tidy<-corpusblogs_proc1.dt %>% unnest_tokens(word,text)
+corpusblogs_proc1.dt.tidy %>% count(word, sort=TRUE) %>%
+filter(n>1500) %>%
+mutate(word = reorder(word, n)) %>%
+ggplot(aes(word, n)) +
+  geom_col()+
+  xlab("Words")+
+  coord_flip()+
+  ggtitle("Word Count - BLOGS")
+
+
+
+#usnews
+corpususnews_proc1.dt<-data.table(text=sapply(corpususnews_proc1, identity), stringsAsFactors = F)
+corpususnews_proc1.dt.tidy<-corpususnews_proc1.dt %>% unnest_tokens(word, text)
+corpususnews_proc1.dt.tidy %>% count(word, sort=TRUE) %>%
+  filter(n>75) %>%
+  mutate(word = reorder(word, n)) %>%
+ggplot(aes(word, n)) +
+  geom_col()+
+  xlab("Words")+
+  coord_flip()+
+  ggtitle("Word Count - US NEWS")
+
+
+#Twitter
+corpustwitter_proc1.dt<-data.table(text=sapply(corpustwitter_proc1, identity), stringsAsFactors = F)
+corpustwitter_proc1.dt.tidy<-corpustwitter_proc1.dt %>% unnest_tokens(word, text)
+corpustwitter_proc1.dt.tidy %>% count(word, sort=TRUE) %>%
+  filter(n>2000) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) + 
+  geom_col()+
+  xlab("Words")+
+  coord_flip()+
+  ggtitle("Word Count - Twitter")
+
+```
+
+## Tokenizing based on Adjacent words
+  - Consecutive sequence of words called "n-grams"
+  - Bigram
+  - There seems a lot of count of Bigrams such as "dont", "wont" .. somewords that ends on a t , we would need to remove those.
+  
+
+```{r Using the Same structure as above but with n-grams, eval=TRUE, message=FALSE, warning=FALSE}
+
+library(dplyr)
+library(tidytext)
+library(tidyr)
+l = list(corpusblogs_proc1.dt, corpususnews_proc1.dt,corpustwitter_proc1.dt)
+comb.dt<-rbindlist(l)
+
+comb.dt.bigram <-  comb.dt %>% unnest_tokens(bigram, text, token="ngrams", n=2)
+
+#Removing the words that end with t and stop words
+
+comb.dt.bigram_separated<-comb.dt.bigram %>% separate(bigram, c("word1","word2"), sep=" ")
+
+comb.dt.bigram_filtered <- comb.dt.bigram_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+
+comb.dt.bigram_filtered <- comb.dt.bigram_filtered %>%
+  filter(!word2 %in% "t")
+
+comb.dt.bigram_united <- comb.dt.bigram_filtered %>%
+  unite(bigram, word1, word2, sep=" ")
+
+comb.dt.bigram_united %>% count(bigram, sort=TRUE) %>%
+  filter(n>100) %>%
+  mutate(bigram = reorder(bigram, n)) %>%
+  ggplot(aes(bigram, n)) +
+  geom_col()+
+  xlab("bigram")+
+  coord_flip() +
+  ggtitle("Bigram Count - Combined Dataset")
+  
+```
+
+## Trigram Frequency Determination 
+  - For this case , We decide to keep all the stop words etc .. and see how it goes 
+  - Word Cloud and the frequency distribution for all the trigrams
+
+
+```{r Same code as Bigram, eval=TRUE, message=FALSE, warning=FALSE}
+library(wordcloud)
+comb.dt.trigram <- comb.dt %>% unnest_tokens(trigram, text, token="ngrams", n=3)
+set.seed(1234)
+comb.dt.final <- comb.dt.trigram %>% count(trigram , sort=TRUE)
+wordcloud(words = comb.dt.final$trigram, freq = comb.dt.final$n, max.words = 100, colors = brewer.pal(6,"Dark2")) 
+
+# plot of frequencies 
+comb.dt.final %>%
+  filter(n>50) %>%
+ggplot(aes(trigram, n)) +
+  geom_col() +
+  xlab("trigram") +
+  coord_flip() +
+  ggtitle("Trigram Count - Combined Dataset")
+
+```
+
+## Plotting Top 10 Unigram, Bigram & Trigram for Blogs, news and twitter dataset in one Plot
+  - For this case I did not do a lot of filtering , as i wanted to check the raw top 10 
+
+```{r Combined-Plot, message=FALSE, warning=FALSE, eval=TRUE}
+par(mfrow=c(3,3))
+data.blogs = corpusblogs_proc1.dt.tidy %>% count(word, sort=TRUE) 
+data.news = corpususnews_proc1.dt.tidy %>% count(word, sort=TRUE)
+data.twitter = corpustwitter_proc1.dt.tidy %>% count(word, sort=TRUE)
+
+
+ggblog1 <- ggplot(data = head(data.blogs,10)) + geom_bar(aes(x=word, y=n), stat="identity") + coord_flip() + xlab("Unigram Blog Words")
+ggnews1 <- ggplot(data = head(data.news,10)) + geom_bar(aes(x=word, y=n), stat="identity") + coord_flip() + xlab("Unigram news Words")
+ggtwitter1 <- ggplot(data = head(data.twitter,10)) + geom_bar(aes(x=word, y=n), stat="identity") + coord_flip() + xlab("Unigram twitter Words")
+
+list1 <- list(ggblog1,ggnews1,ggtwitter1)
+
+data.blogs.bigram <-  corpusblogs_proc1.dt %>% unnest_tokens(bigram, text, token="ngrams", n=2) %>% count(bigram, sort=TRUE)
+data.news.bigram <-  corpususnews_proc1.dt %>% unnest_tokens(bigram, text, token="ngrams", n=2) %>% count(bigram, sort=TRUE)
+data.twitter.bigram <-  corpustwitter_proc1.dt %>% unnest_tokens(bigram, text, token="ngrams", n=2) %>% count(bigram, sort=TRUE)
+
+ggblog2 <- ggplot(data = head(data.blogs.bigram,10)) + geom_bar(aes(x=bigram, y=n), stat="identity") + coord_flip() + xlab("Bigram Blog Words")
+ggnews2 <- ggplot(data = head(data.news.bigram,10)) + geom_bar(aes(x=bigram, y=n), stat="identity") + coord_flip() + xlab("Bigram news Words")
+ggtwitter2 <- ggplot(data = head(data.twitter.bigram,10)) + geom_bar(aes(x=bigram, y=n), stat="identity") + coord_flip() + xlab("Bigram twitter Words")
+
+list2 <- list(ggblog2,ggnews2,ggtwitter2)
+
+data.blogs.trigram <-  corpusblogs_proc1.dt %>% unnest_tokens(trigram, text, token="ngrams", n=3) %>% count(trigram, sort=TRUE)
+data.news.trigram <-  corpususnews_proc1.dt %>% unnest_tokens(trigram, text, token="ngrams", n=3) %>% count(trigram, sort=TRUE)
+data.twitter.trigram <-  corpustwitter_proc1.dt %>% unnest_tokens(trigram, text, token="ngrams", n=3) %>% count(trigram, sort=TRUE)
+
+ggblog3 <- ggplot(data = head(data.blogs.trigram,10)) + geom_bar(aes(x=trigram, y=n), stat="identity") + coord_flip() + xlab("Trigram Blog Words")
+ggnews3 <- ggplot(data = head(data.news.trigram,10)) + geom_bar(aes(x=trigram, y=n), stat="identity") + coord_flip() + xlab("Trigram news Words")
+ggtwitter3 <- ggplot(data = head(data.twitter.trigram,10)) + geom_bar(aes(x=trigram, y=n), stat="identity") + coord_flip() + xlab("Trigram twitter Words")
+
+list3 <- list(ggblog3,ggnews3,ggtwitter3)
+
+library(grid)
+library(gridExtra)
+grid.arrange(grobs = c(list1,list2,list3),ncol = 3, as.table = FALSE)
+
+```
+
+
+
+# How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
+  - For The current sample size of 3% , we will calculate the frequency dictionary
+  - Below We see that as percentage to cover increase the number of unique words increase dramatically , showing that rank of the word is inversely proportional to the frequency
+
+```{r unique words, message=FALSE, warning=FALSE,eval=TRUE}
+comb.dt.freqdict<-comb.dt %>% unnest_tokens(word, text) %>% count(word, sort=TRUE)
+sumofwords <- sum(comb.dt.freqdict$n)
+
+print(paste("The total number of words present here", sumofwords))
+sumcounter<<-0
+counter<<-0
+valtemp<-lapply(comb.dt.freqdict$n, function(x){
+  if (sumcounter<=0.5*sumofwords) {
+   sumcounter<<-sumcounter+x
+   counter<<-counter+1
+  }
+})
+
+print(paste("The number of unique words required to cover 50% of all words in case of a sample size of 3% = ", counter))
+
+sumcounter<<-0
+counter<<-0
+valtemp<-lapply(comb.dt.freqdict$n, function(x){
+  if (sumcounter<=0.9*sumofwords) {
+   sumcounter<<-sumcounter+x
+   counter<<-counter+1
+  }
+})
+
+print(paste("The number of unique words required to cover 90% of all words in case of a sample size of 3% = ", counter))
+
+```
+
+## How do you evaluate how many of the words come from foreign languages?
+ - Right now I did not deal with foreign language words as it seems after the Frequency distributions of the english words , these words are have very low presence , and if present they need to compared based on a hashmap or dictionary data base of some sort 
+ 
+## Can you think of a way to increase the coverage -- identifying words that may not be in the corpora or using a smaller number of words in the dictionary to cover the same number of phrases? 
+  - This is an interesting question that involves prediction based on smaller sample size, we can use higher order n-grams with higher frequency and remove the lower frequency ones to predict which words are more probable to appear in a larger Population size .
+
+## Summary of Findings
+
+  - **Zipf's Law** - The Frequency that a word appears is inversely proportional to the rank of the word
+  - Initially I thought of using the tdm function to form a tem document matrix from the corpus data, but it seems that is not possible to process due to size limitations and hence I decided to go with data tables instead , which as expected are good with large datasets
+  - I also see even after a lot of filtering , some words like *won't , don't, can't* , need to filtered out of the 2- or 3- n grams as they will produce misleading frequency distributions
+  - Sampling only 3% of the data seems to be low, so I will be increasing my sample size to 10% in the coming runs of the project
+  
+## Future Feedback
+
+  - I plan to use some sort of a algorithm , I see there is a discussion about KBO(Katz backoff) , We basically need to predict the next word in a sequence of words . 
+    + There could be a Bayesian approch to the prediction problem with putting probablities on each of the words in a n-gram to predict n+1 word 
+    + There should be other similar approaces to KBO , which I plan to study and implement as required 
+  - I would also try to change my sample size and see how that changes my Frequency distributions
+  - I also believe there is a lot of research/reading papers/tutorials & videos that needs to be done between task-2 and task-3 to reach a more through understanding of a better approach
+
+```{r Find the length of the biggest line, message=FALSE, eval=TRUE, warning=FALSE, echo=FALSE}
 library(stringi)
 
 
@@ -107,6 +461,20 @@ linesnew[grepl(teststring, linesnew, perl = TRUE, ignore.case = FALSE)]
 ```
 
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+# Some Important Links for Help 
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+  + https://stackoverflow.com/questions/18101047/list-of-word-frequencies-using-r
+  + https://stackoverflow.com/questions/21641522/how-to-remove-specific-special-characters-in-r
+  + https://stackoverflow.com/questions/30435054/how-to-show-corpus-text-in-r-tm-package
+  + http://www.sthda.com/english/wiki/text-mining-and-word-cloud-fundamentals-in-r-5-simple-steps-you-should-know
+  + https://stackoverflow.com/questions/11525408/r-regular-expressions-unexpected-behavior-of-digit
+  + **Converting Corpus to Data frame** : https://stackoverflow.com/questions/24703920/r-tm-package-vcorpus-error-in-converting-corpus-to-data-frame 
+  + **tidytest package**: http://tidytextmining.com/tidytext.html
+  + **String and text manipulation**: https://www3.nd.edu/~steve/computing_with_data/19_strings_and_text/strings_and_text.html#/24
+  + **Use of Word Cloud** : https://rstudio-pubs-static.s3.amazonaws.com/265713_cbef910aee7642dc8b62996e38d2825d.html
+  + **Term document matrix** : https://www.rdocumentation.org/packages/qdap/versions/2.0.0/topics/tdm
+  + **Binding multiple Data-tables** 
+    - https://rdrr.io/rforge/data.table/man/rbindlist.html 
+    - https://stackoverflow.com/questions/2232699/how-to-do-a-data-table-merge-operation
+    - https://www.rdocumentation.org/packages/data.table/versions/1.10.4/topics/merge
+    - https://rdrr.io/rforge/data.table/man/merge.html
