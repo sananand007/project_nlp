@@ -40,7 +40,7 @@ This is the training data to get you started that will be the basis for most of 
 
 ```{r Loading the Data, message=FALSE, warning=FALSE, eval=FALSE, echo=TRUE}
 path1<-NULL
-path1 <- "C:/Public/nlp"
+path1 <- "C:/Public/Data-Science[JHU-Coursera]/project_nlp/"
 
 for(i in list.files(path = path1, pattern = "\\.zip$")) {
   unzip(i, overwrite = TRUE)
@@ -50,7 +50,7 @@ for(i in list.files(path = path1, pattern = "\\.zip$")) {
 ## Getting the Filenames and also getting connections to read the Text files
 
 ```{r checking the files, message=FALSE, warning=FALSE, eval=TRUE, echo=TRUE}
-path1 <- "C:/Public/nlp"
+path1 <- "C:/Public/Data-Science[JHU-Coursera]/project_nlp/"
 foldernames <- c("DE", "US", "FI", "RU")
 filenames_n<-character(0)
 for (j in list.dirs(path = path1)) {
@@ -86,8 +86,9 @@ for (j in list.dirs(path = path1)) {
        if (grepl(".txt", k, perl = TRUE)) {
          countern<<-countern+1
          pathtemp <- paste(j,k, sep = "/")
+         print(pathtemp)
          filesize[countern]<-file.size(pathtemp)
-         nam <- unlist(strip(strsplit(pathtemp, "/")))[6]
+         nam <- unlist(strip(strsplit(unlist(strip(strsplit(pathtemp, "/")))[8], "\\.")))[2]
          assign(nam, NULL)
          conntemp <- file(pathtemp, open = "r")
          lines <- readLines(conntemp)
@@ -97,6 +98,254 @@ for (j in list.dirs(path = path1)) {
    }
   }
 }
+
+```
+
+## Representing the data in terms of Data Table format
+  - Tokenizing
+  - Reason for choosing this other way is form a training set of sample size = 70% and test set of sample size = 30%
+  - Getting a sample sizes
+  
+
+```{r table, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
+library(data.table)
+blogs.dt <- as.data.table(blogs)
+news.dt <- as.data.table(news)
+twitter.dt <- as.data.table(twitter)
+
+rm(lines, blogs, news, twitter)
+gc()
+
+blogs.dt$line <- c(1:blogs.dt[,.N])
+news.dt$line <- c(1:news.dt[,.N])
+twitter.dt$line <- c(1:twitter.dt[,.N])
+```
+
+** Splitting into training and test set**
+ - Splitting Train:Test = 0.7:0.3
+
+```{r split, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
+
+library(dplyr)
+blogs.train<-sample_frac(blogs.dt, 0.7)
+blogs.test<-blogs.dt[-blogs.train$line,]
+
+news.train<-sample_frac(news.dt,0.7)
+news.test<-news.dt[-news.train$line,]
+
+twitter.train<-sample_frac(twitter.dt,0.7)
+twitter.test<-twitter.dt[-twitter.train$line,]
+```
+
+
+
+- Cleaning the Data tables to have only relevant words
+- Cleaning the data tables to have no weird symbols and numbers
+- After this step mostly the sentences look clean and only words and letters
+
+```{r clean1, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
+head(blogs.train,20)
+library(stringr)
+library(data.table)
+pattern <- "â???T|â???"|â???o|â???Tll|Ãª|â???|\\.|\\,|\\-|[[:punct:]]|~|@|[[:digit:]]|Â.|Â£|[^A-Za-z///' ]"
+#gsub(pattern = pattern, "",x)
+blogs.train[, 'blogs':=lapply(.SD, function(x){
+  gsub(pattern = pattern, "", x)
+}),.SDcols = c('blogs')]
+
+head(news.train)
+news.train[, 'news':=lapply(.SD, function(x){
+  gsub(pattern = pattern, "", x)
+}), .SDcols=c('news')]
+
+head(twitter.train)
+twitter.train[, 'twitter':=lapply(.SD, function(x){
+  gsub(pattern = pattern, "", x)
+}), .SDcols = c('twitter')]
+
+rm(blogs.dt, news.dt, twitter.dt, tempstring)
+gc()
+
+```
+
+- Getting the count and probability for 1-gram model
+
+```{r gram, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
+library(tidytext)
+library(dplyr)
+blg_uni<-blogs.train %>% unnest_tokens(word, blogs) %>% anti_join(stop_words) %>% 
+  count(word, sort=TRUE)
+blg_uni <- blg_uni %>% mutate(prob = n/sum(blg_uni$n))
+
+news_uni<-news.train %>% unnest_tokens(word, news) %>% anti_join(stop_words) %>%
+  count(word, sort=TRUE)
+news_uni<- news_uni %>% mutate(prob = n/sum(news_uni$n))
+
+twit_uni<-twitter.train %>% unnest_tokens(word, twitter) %>% anti_join(stop_words) %>%
+  count(word, sort=TRUE)
+twit_uni<- twit_uni %>% mutate(prob = n/sum(twit_uni$n))
+
+#Write a function to get the average Probability of any word present in all the three df's
+f<-function(word, flag) {
+  prob1<-NULL
+  prob2<-NULL
+  prob3<-NULL
+  if (flag == 0){
+    prob1<-blg_uni[blg_uni$word==word,]$prob
+    prob2<-news_uni[news_uni$word==word,]$prob
+    prob3<-twit_uni[twit_uni$word==word,]$prob
+  }else if (flag == 1){
+    prob1<-blogs.train_bigrams[blogs.train_bigrams$bigram==word,]$prob
+    prob2<-news.train_bigrams[news.train_bigrams$bigram==word,]$prob
+    prob3<-twitter.train_bigrams[twitter.train_bigrams$bigram==word,]$prob
+  } else if (flag == 2){
+    prob1<-blogs.train_trigrams[blogs.train_trigrams$trigram==word,]$prob
+    prob2<-news.train_trigrams[news.train_trigrams$trigram==word,]$prob
+    prob3<-twitter.train_trigrams[twitter.train_trigrams$trigram==word,]$prob
+  } else {
+    prob1<-blogs.train_quadgrams[blogs.train_quadgrams$quadgram==word,]$prob
+    prob2<-news.train_quadgrams[news.train_quadgrams$quadgram==word,]$prob
+    prob3<-twitter.train_quadgrams[twitter.train_quadgrams$quadgram==word,]$prob
+  }
+  return(mean(c(prob1,prob2,prob3)))
+}
+
+# Test vectors
+testvector <- c("referees", "crowd", "defense", "players")
+ans<-lapply(testvector, function(x) f(x,0))
+ans
+
+```
+
+
+# N-gram Models
+
+  - Building a 2-gram and 3-gram model 
+  - Determining the probability of occurence of words as well here
+```{r 2gram, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
+
+library(dplyr)
+library(tidytext)
+blogs.train_bigrams<-NULL
+news.train_bigrams<-NULL
+twitter.train_bigrams<-NULL
+
+blogs.train_bigrams <- blogs.train %>% unnest_tokens(bigram, blogs, token="ngrams", n=2) 
+blogs.train_bigrams <- blogs.train_bigrams %>% count(bigram, sort=TRUE)
+
+news.train_bigrams <- news.train %>% unnest_tokens(bigram, news, token="ngrams", n=2)
+news.train_bigrams <- news.train_bigrams %>% count(bigram, sort=TRUE)
+
+twitter.train_bigrams <- twitter.train %>% unnest_tokens(bigram, twitter, token="ngrams", n=2)
+twitter.train_bigrams <- twitter.train_bigrams %>% count(bigram, sort=TRUE)
+
+blogs.train_bigrams <- blogs.train_bigrams %>% mutate(prob = n/sum(blogs.train_bigrams$n))
+news.train_bigrams <- news.train_bigrams %>% mutate(prob = n/sum(news.train_bigrams$n))
+twitter.train_bigrams <- twitter.train_bigrams %>% mutate(prob=n/sum(news.train_bigrams$n))
+
+#Test vectors
+testvector<-NULL
+ans<-NULL
+#testvector <- c("struggling but the referees", "struggling but the crowd", "struggling but the defense", "struggling but the players")
+#testvector <- c("romantic date at the grocery", "romantic date at the beach", "romantic date at the movies", "romantic date at the mall")
+testvector <- c("you must be callous","you must be insensitive","you must be insane","you must be asleep")
+ans <- lapply(testvector,function(x) f(x,1))
+ans
+
+
+
+# Get the counts for each unit above
+for(i in 1:length(testvector)) {
+  ans<-unlist(strip(strsplit(testvector[i]," ")))
+  res<-sum(blg_uni[blg_uni$word==ans[length(ans)],]$n,news_uni[news_uni$word==ans[length(ans)],]$n,twit_uni[twit_uni$word==ans[length(ans)],]$n)
+  cat(ans[length(ans)],res,'\n')
+}
+
+# Get the counts for 2-grams above
+for(i in 1:length(testvector)) {
+  ans1<-unlist(strip(strsplit(testvector[i]," ")))
+  for(j in 2:length(ans1)-1) {
+    res <- paste(ans1[j],ans1[j+1],sep = " ")
+    res1 <- sum(blogs.train_bigrams[blogs.train_bigrams$bigram==res,]$n ,news.train_bigrams[news.train_bigrams$bigram==res,]$n, twitter.train_bigrams[twitter.train_bigrams$bigram==res,]$n)
+    cat(res, '=', res1,'\n')
+    
+  }
+}
+
+```
+
+```{r 3gram, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
+
+blogs.train_trigrams<-NULL
+news.train_trigrams<-NULL
+twitter.train_trigrams<-NULL
+
+blogs.train_trigrams <- blogs.train %>% unnest_tokens(trigram, blogs, token="ngrams", n=3) 
+blogs.train_trigrams <- blogs.train_trigrams %>% count(trigram, sort=TRUE)
+
+news.train_trigrams <- news.train %>% unnest_tokens(trigram, news, token="ngrams", n=3)
+news.train_trigrams <- news.train_trigrams %>% count(trigram, sort=TRUE)
+
+twitter.train_trigrams <- twitter.train %>% unnest_tokens(trigram, twitter, token="ngrams", n=3)
+twitter.train_trigrams <- twitter.train_trigrams %>% count(trigram, sort=TRUE)
+
+blogs.train_trigrams <- blogs.train_trigrams %>% mutate(prob = n/sum(blogs.train_trigrams$n))
+news.train_trigrams <- news.train_trigrams %>% mutate(prob = n/sum(news.train_trigrams$n))
+twitter.train_trigrams <- twitter.train_trigrams %>% mutate(prob=n/sum(twitter.train_trigrams$n))
+
+#Test vectors
+testvector<-NULL
+ans<-NULL
+testvector <- c("mean the best", "mean the universe", "mean the most", "mean the world")
+ans <- lapply(testvector,function(x) f(x,2))
+ans
+
+rm(blogs.train_trigrams,news.train_trigrams,twitter.train_trigrams)
+gc()
+```
+
+  - For a 4-gram model, we would need to decrease the training size as this model has Ram limitations with my PC [-i5, 8GB Ram]
+  
+** Splitting into a smaller training set to use for a 4-gram model**
+  - Splitting Train:Test = 0.3:0.7
+  - Use it only after cleaning workspace but need to clear this after use
+
+```{r splitsmall, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
+blogs.trainsmall <- sample_frac(blogs.train,0.1)
+news.trainsmall <- sample_frac(news.train,0.1)
+twitter.trainsmall <- sample_frac(twitter.train,0.1)
+```  
+
+```{r 4gram, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
+library(tidytext)
+library(dplyr)
+
+blogs.train_quadgrams<-NULL
+news.train_quadgrams<-NULL
+twitter.train_quadgrams<-NULL
+
+blogs.train_quadgrams <- blogs.trainsmall %>% unnest_tokens(quadgram, blogs, token="ngrams", n=4) 
+blogs.train_quadgrams <- blogs.train_quadgrams %>% count(quadgram, sort=TRUE)
+
+news.train_quadgrams <- news.train %>% unnest_tokens(quadgram, news, token="ngrams", n=4)
+news.train_quadgrams <- news.train_quadgrams %>% count(quadgram, sort=TRUE)
+
+twitter.train_quadgrams <- twitter.train %>% unnest_tokens(quadgram, twitter, token="ngrams", n=4)
+twitter.train_quadgrams <- twitter.train_quadgrams %>% count(quadgram, sort=TRUE)
+
+blogs.train_quadgrams <- blogs.train_quadgrams %>% mutate(prob = n/sum(blogs.train_quadgrams$n))
+news.train_quadgrams <- news.train_quadgrams %>% mutate(prob = n/sum(news.train_quadgrams$n))
+twitter.train_quadgrams <- twitter.train_quadgrams %>% mutate(prob=n/sum(twitter.train_quadgrams$n))
+
+#Test vectors
+testvector<-NULL
+ans<-NULL
+testvector <- c("struggling but the referees", "struggling but the crowd", "struggling but the defense", "struggling but the players")
+ans <- lapply(testvector,function(x) f(x,3))
+ans
+
+rm(blogs.train_quadgrams,news.train_quadgrams,twitter.train_quadgrams, blogs.trainsmall, news.trainsmall, twitter.trainsmall)
+gc()
 
 ```
 
@@ -478,3 +727,5 @@ linesnew[grepl(teststring, linesnew, perl = TRUE, ignore.case = FALSE)]
     - https://stackoverflow.com/questions/2232699/how-to-do-a-data-table-merge-operation
     - https://www.rdocumentation.org/packages/data.table/versions/1.10.4/topics/merge
     - https://rdrr.io/rforge/data.table/man/merge.html
+  + **Packages to help for text analysis**
+    - https://cran.r-project.org/web/views/NaturalLanguageProcessing.html
