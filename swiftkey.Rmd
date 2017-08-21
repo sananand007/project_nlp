@@ -122,18 +122,25 @@ twitter.dt$line <- c(1:twitter.dt[,.N])
 ```
 
 ** Splitting into training and test set**
- - Splitting Train:Test = 0.7:0.3
+ - Splitting Train:Test = 0.6:0.4
 
 ```{r split, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
 
 library(dplyr)
-blogs.train<-sample_frac(blogs.dt, 0.7)
+blogs.train<-NULL
+blogs.test<-NULL
+news.train<-NULL
+news.test<-NULL
+twitter.train<-NULL
+twitter.test<-NULL
+
+blogs.train<-sample_frac(blogs.dt, 0.6)
 blogs.test<-blogs.dt[-blogs.train$line,]
 
-news.train<-sample_frac(news.dt,0.7)
+news.train<-sample_frac(news.dt,0.6)
 news.test<-news.dt[-news.train$line,]
 
-twitter.train<-sample_frac(twitter.dt,0.7)
+twitter.train<-sample_frac(twitter.dt,0.6)
 twitter.test<-twitter.dt[-twitter.train$line,]
 ```
 
@@ -169,19 +176,20 @@ gc()
 ```
 
 - Getting the count and probability for 1-gram model
+- Taking Out the stop words to make the probability more specific
 
 ```{r gram, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
 library(tidytext)
 library(dplyr)
-blg_uni<-blogs.train %>% unnest_tokens(word, blogs) %>% anti_join(stop_words) %>% 
+blg_uni<-blogs.train %>% unnest_tokens(word, blogs) %>% 
   count(word, sort=TRUE)
 blg_uni <- blg_uni %>% mutate(prob = n/sum(blg_uni$n))
 
-news_uni<-news.train %>% unnest_tokens(word, news) %>% anti_join(stop_words) %>%
+news_uni<-news.train %>% unnest_tokens(word, news) %>%
   count(word, sort=TRUE)
 news_uni<- news_uni %>% mutate(prob = n/sum(news_uni$n))
 
-twit_uni<-twitter.train %>% unnest_tokens(word, twitter) %>% anti_join(stop_words) %>%
+twit_uni<-twitter.train %>% unnest_tokens(word, twitter) %>%
   count(word, sort=TRUE)
 twit_uni<- twit_uni %>% mutate(prob = n/sum(twit_uni$n))
 
@@ -209,11 +217,6 @@ f<-function(word, flag) {
   }
   return(mean(c(prob1,prob2,prob3)))
 }
-
-# Test vectors
-testvector <- c("referees", "crowd", "defense", "players")
-ans<-lapply(testvector, function(x) f(x,0))
-ans
 
 ```
 
@@ -243,16 +246,20 @@ blogs.train_bigrams <- blogs.train_bigrams %>% mutate(prob = n/sum(blogs.train_b
 news.train_bigrams <- news.train_bigrams %>% mutate(prob = n/sum(news.train_bigrams$n))
 twitter.train_bigrams <- twitter.train_bigrams %>% mutate(prob=n/sum(news.train_bigrams$n))
 
+```
+
+ - Probability function to get the probability of the sentence
+ - Getting the comparision of probabilites to predict which sentence is likely to be probable based on the dataset
+ - Training dataset is covering 60% of the total data
+
+```{r prob, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
+
 #Test vectors
 testvector<-NULL
 ans<-NULL
 #testvector <- c("struggling but the referees", "struggling but the crowd", "struggling but the defense", "struggling but the players")
-#testvector <- c("romantic date at the grocery", "romantic date at the beach", "romantic date at the movies", "romantic date at the mall")
-testvector <- c("you must be callous","you must be insensitive","you must be insane","you must be asleep")
-ans <- lapply(testvector,function(x) f(x,1))
-ans
-
-
+#testvector <- c("Go on a romantic date at the grocery", "romantic date at the beach", "romantic date at the movies", "romantic date at the mall")
+#testvector <- c("you must be callous","you must be insensitive","you must be insane","you must be asleep")
 
 # Get the counts for each unit above
 for(i in 1:length(testvector)) {
@@ -262,17 +269,28 @@ for(i in 1:length(testvector)) {
 }
 
 # Get the counts for 2-grams above
-for(i in 1:length(testvector)) {
-  ans1<-unlist(strip(strsplit(testvector[i]," ")))
-  for(j in 2:length(ans1)-1) {
-    res <- paste(ans1[j],ans1[j+1],sep = " ")
-    res1 <- sum(blogs.train_bigrams[blogs.train_bigrams$bigram==res,]$n ,news.train_bigrams[news.train_bigrams$bigram==res,]$n, twitter.train_bigrams[twitter.train_bigrams$bigram==res,]$n)
-    cat(res, '=', res1,'\n')
+findprob<-function(testvector) {
+  for(i in 1:length(testvector)) {
+    finalprob <- c()  
+    ans1<-unlist(strip(strsplit(tolower(testvector[i])," ")))
+    for(j in 2:length(ans1)-1) {
+      res <- paste(ans1[j],ans1[j+1],sep = " ")
+      res1 <- sum(blogs.train_bigrams[blogs.train_bigrams$bigram==res,]$n ,news.train_bigrams[news.train_bigrams$bigram==res,]$n, twitter.train_bigrams[twitter.train_bigrams$bigram==res,]$n)
+      #cat(res, '=', res1,'\n')
+    
+      #Get the final Probability here
+      finalprob[j-1] <- res1/sum(blg_uni[blg_uni$word==ans1[j],]$n, news_uni[news_uni$word==ans1[j],]$n, twit_uni[twit_uni$word==ans1[j],]$n)
     
   }
+    cat("Probability of the sentence ", i, ":", prod(finalprob),"\n")
+}
 }
 
+testvector <- c("Go on a romantic date at the grocery", "Go on a romantic date at the beach")
+findprob(testvector = testvector)
+
 ```
+
 
 ```{r 3gram, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
 
