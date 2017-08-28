@@ -14,6 +14,8 @@ Date: August 5, 2017
 
 This is a concise Markdown document that is describing the step by step process of handling this NLP project . This is the first milestone report that is showing the progress for the complete project.
 
+**Make sure to run the code from the start or it will not be useful**
+
 **The motivation for this project is to:** 
 
   1. Demonstrate that you've downloaded the data and have successfully loaded it in.
@@ -207,13 +209,19 @@ f<-function(word, flag) {
     prob2<-news.train_bigrams[news.train_bigrams$bigram==word,]$prob
     prob3<-twitter.train_bigrams[twitter.train_bigrams$bigram==word,]$prob
   } else if (flag == 2){
-    prob1<-blogs.train_trigrams[blogs.train_trigrams$trigram==word,]$prob
-    prob2<-news.train_trigrams[news.train_trigrams$trigram==word,]$prob
-    prob3<-twitter.train_trigrams[twitter.train_trigrams$trigram==word,]$prob
+    prob1 <- ng3.blog[ng3.blog$ngrams==word,]$prop
+    prob2 <- ng3.news[ng3.news$ngrams==word,]$prop
+    prob3 <- ng3.twitter[ng3.twitter$ngrams==word,]$prop
+    #prob1<-blogs.train_trigrams[blogs.train_trigrams$trigram==word,]$prob
+    #prob2<-news.train_trigrams[news.train_trigrams$trigram==word,]$prob
+    #prob3<-twitter.train_trigrams[twitter.train_trigrams$trigram==word,]$prob
   } else {
-    prob1<-blogs.train_quadgrams[blogs.train_quadgrams$quadgram==word,]$prob
-    prob2<-news.train_quadgrams[news.train_quadgrams$quadgram==word,]$prob
-    prob3<-twitter.train_quadgrams[twitter.train_quadgrams$quadgram==word,]$prob
+    prob1 <- ng4.blog[ng4.blog$ngrams==word,]$prop
+    prob2 <- ng4.news[ng4.news$ngrams==word,]$prop
+    prob3 <- ng4.twitter[ng4.twitter$ngrams==word,]$prop
+    #prob1<-blogs.train_quadgrams[blogs.train_quadgrams$quadgram==word,]$prob
+    #prob2<-news.train_quadgrams[news.train_quadgrams$quadgram==word,]$prob
+    #prob3<-twitter.train_quadgrams[twitter.train_quadgrams$quadgram==word,]$prob
   }
   return(mean(c(prob1,prob2,prob3)))
 }
@@ -248,6 +256,58 @@ twitter.train_bigrams <- twitter.train_bigrams %>% mutate(prob=n/sum(news.train_
 
 ```
 
+  - Trying the 3-gram model using the n-gram package as well to check performance
+  - Seems ngram package is quite slower
+  - Considering a smaller sample size of the 3-gram model due to memory contraints
+```{r 2gram-ngram, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
+library(ngram)
+
+# Get the count of words to clean up , only using 1% of the current sample size
+
+blogs.train[, 'count':=lapply(.SD, function(x){
+ sapply(strsplit(x, "\\s+"), length)
+}), .SDcols=c('blogs')]
+
+news.train[, 'count':=lapply(.SD, function(x){
+  sapply(strsplit(x, "\\s+"), length)
+}), .SDcols=c('news')]
+
+twitter.train[, 'count':=lapply(.SD, function(x){
+  sapply(strsplit(x, "\\s+"), length)
+}), .SDcols=c('twitter')]
+
+# Subset based on count >= 3
+blogs.train<-blogs.train[with(blogs.train, count>=4),]
+news.train<-news.train[with(news.train, count>=4),]
+twitter.train<-twitter.train[with(twitter.train, count>=4),]
+
+#3-gram
+l1<-0.1*length(blogs.train$blogs)
+ng3<-ngram(blogs.train[1:l1]$blogs, n=3)
+ng3.blog<-as.data.frame(get.phrasetable(ng3)) 
+
+l2<-0.7*length(news.train$news)
+ng3.news<-as.data.frame(get.phrasetable(ngram(news.train[1:l2]$news, n=3)))
+
+l3<-0.1*length(twitter.train$twitter)
+ng3.twitter<-as.data.frame(get.phrasetable(ngram(twitter.train[1:l3]$twitter, n=3)))
+
+rm(ng3)
+gc()
+
+# Subset based on count >= 4
+blogs.train<-blogs.train[with(blogs.train, count>=5),]
+news.train<-news.train[with(news.train, count>=5),]
+twitter.train<-twitter.train[with(twitter.train, count>=5),]
+
+ng4.blog<-as.data.frame(get.phrasetable(ngram(blogs.train[1:l1]$blogs,n=4)))
+
+ng4.news<-as.data.frame(get.phrasetable(ngram(news.train[1:l2]$news, n=4)))
+
+ng4.twitter<-as.data.frame(get.phrasetable(ngram(twitter.train[1:l3]$twitter, n=4)))
+
+```
+
  - Probability function to get the probability of the sentence
  - Getting the comparision of probabilites to predict which sentence is likely to be probable based on the dataset
  - Training dataset is covering 60% of the total data
@@ -257,21 +317,22 @@ twitter.train_bigrams <- twitter.train_bigrams %>% mutate(prob=n/sum(news.train_
 #Test vectors
 testvector<-NULL
 ans<-NULL
-#testvector <- c("struggling but the referees", "struggling but the crowd", "struggling but the defense", "struggling but the players")
-#testvector <- c("Go on a romantic date at the grocery", "romantic date at the beach", "romantic date at the movies", "romantic date at the mall")
-#testvector <- c("you must be callous","you must be insensitive","you must be insane","you must be asleep")
+
 
 # Get the counts for each unit above
-for(i in 1:length(testvector)) {
-  ans<-unlist(strip(strsplit(testvector[i]," ")))
-  res<-sum(blg_uni[blg_uni$word==ans[length(ans)],]$n,news_uni[news_uni$word==ans[length(ans)],]$n,twit_uni[twit_uni$word==ans[length(ans)],]$n)
-  cat(ans[length(ans)],res,'\n')
-}
+# for(i in 1:length(testvector)) {
+#   ans<-unlist(strip(strsplit(testvector[i]," ")))
+#   res<-sum(blg_uni[blg_uni$word==ans[length(ans)],]$n,news_uni[news_uni$word==ans[length(ans)],]$n,twit_uni[twit_uni$word==ans[length(ans)],]$n)
+#   cat(ans[length(ans)],res,'\n')
+# }
+
+pattern2 = "[[:punct:]]|\\,|\\'"
 
 # Get the counts for 2-grams above
 findprob<-function(testvector) {
   for(i in 1:length(testvector)) {
-    finalprob <- c()  
+    finalprob <- c()
+    testvector[i]<-gsub(pattern = pattern2, "", testvector[i])
     ans1<-unlist(strip(strsplit(tolower(testvector[i])," ")))
     for(j in 2:length(ans1)-1) {
       res <- paste(ans1[j],ans1[j+1],sep = " ")
@@ -279,18 +340,65 @@ findprob<-function(testvector) {
       #cat(res, '=', res1,'\n')
     
       #Get the final Probability here
-      finalprob[j-1] <- res1/sum(blg_uni[blg_uni$word==ans1[j],]$n, news_uni[news_uni$word==ans1[j],]$n, twit_uni[twit_uni$word==ans1[j],]$n)
-    
+      res.1<-sum(blg_uni[blg_uni$word==ans1[j],]$n, news_uni[news_uni$word==ans1[j],]$n, twit_uni[twit_uni$word==ans1[j],]$n)
+      finalprob[j-1] <- res1/res.1
+      cat(i," SUM 1 = ",res.1, ", SUM 2 = ",res1, "\n")
   }
     cat("Probability of the sentence ", i, ":", prod(finalprob),"\n")
 }
 }
 
-testvector <- c("Go on a romantic date at the grocery", "Go on a romantic date at the beach")
-findprob(testvector = testvector)
+```
+
+- Using the 3-grams and 2-grams to find the chained Probability 
+
+```{r probfunc2, message=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
+
+findprob2 <- function(testvector) {
+  for(i in 1:length(testvector)) {
+    finalprob <- c()
+    testvector[i]<-gsub(pattern = pattern2, "", testvector[i])
+    ans1<-unlist(strip(strsplit(tolower(testvector[i])," ")))
+    # The counter starts with 2 as for some weird reason 2 is the start
+    for(j in 2:length(ans1)-2) {
+      res.ng3 <- paste(ans1[j], ans1[j+1], ans1[j+2], sep = " ")
+      res.ng2 <- paste(ans1[j], ans1[j+1], sep = " ")
+      
+      #Getting the counts of 3-grams and 3-grams
+      sum.3<-sum(ng3.blog[ng3.blog$ngrams==res.ng3,]$freq, ng3.news[ng3.news$ngrams==res.ng3,]$freq, 
+                 ng3.twitter[ng3.twitter$ngrams==res.ng3,]$freq)
+      sum.2<-sum(blogs.train_bigrams[blogs.train_bigrams$bigram==res.ng2,]$n,
+                 news.train_bigrams[news.train_bigrams$bigram==res.ng2,]$n,
+                 twitter.train_bigrams[twitter.train_bigrams$bigram==res.ng2,]$n)
+      cat(i," SUM 2 = ",sum.2, ", SUM 3 = ",sum.3, "\n")
+      
+      #Get the Probability here
+      if (sum.2 != 0) {
+       finalprob[j-1] <- sum.3/sum.2 
+      }
+      else {finalprob[j-1]<-1}
+    }
+    cat("Probability of the sentence ", i, ":", prod(finalprob),"\n")
+  }
+}
 
 ```
 
+  ** Do the Function Calls here**
+
+```{r functioncall, message=FALSE, warning=FALSE, echo=FALSE, eval=TRUE}
+testvector <- c("Talking to your mom has the same effect as a hug and helps reduce your happiness",
+                "Talking to your mom has the same effect as a hug and helps reduce your stress",
+                "Talking to your mom has the same effect as a hug and helps reduce your hunger",
+                "Talking to your mom has the same effect as a hug and helps reduce your sleepiness")
+
+findprob(testvector = testvector)
+
+
+
+# Need to write separate code for this
+findprob2(testvector = testvector)
+```
 
 ```{r 3gram, message=FALSE, eval=TRUE, echo=FALSE, warning=FALSE}
 
